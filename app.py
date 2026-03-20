@@ -1,5 +1,6 @@
 import streamlit as st
 import random
+import re
 
 # 設定網頁標題和配置
 st.set_page_config(page_title="賽博龐克文字冒險", layout="centered")
@@ -66,6 +67,21 @@ with col3:
 st.subheader("當前場景")
 st.write(st.session_state.scene)
 
+# 道具檢視與使用('蘭位')
+st.subheader("🔧 道具欄")
+if st.session_state.inventory:
+    for idx, item in enumerate(st.session_state.inventory):
+        col1, col2 = st.columns([6, 1])
+        col1.write(f"- {item}")
+        if col2.button("使用", key=f"use_item_{idx}"):
+            msg = use_item(item)
+            st.session_state.inventory.remove(item)
+            st.session_state.scene += f"\n\n使用道具：{item}。{msg}"
+            st.success(f"已使用 {item}：{msg}")
+            st.experimental_rerun()
+else:
+    st.info("目前無道具，快去探索或觸發事件獲得道具！")
+
 # 簡單 AI 回應邏輯 (毒舌酸民風格)
 def generate_response(action):
     action = action.lower()
@@ -109,6 +125,8 @@ def trigger_random_event():
         ("電網故障撞斷你的能量核心！HP -10", -10, 0, None),
         ("幸運！你撿到遺失的加密晶片，分數 +15", 0, 15, None),
         ("無人機空投治療包，HP +20", 20, 0, None),
+        ("你找到一個廢棄機箱，裡面有增強藥劑！", 0, 0, "增強藥劑"),
+        ("你破解了黑市倉庫，獲得護盾模組。", 0, 0, "護盾模組"),
         ("遇到街頭黑客埋伏，HP -20", -20, 0, None),
         ("霓虹煙霧彈爆開，HP -5，下一回合傷害減半（TODO）", -5, 0, None)
     ]
@@ -132,6 +150,31 @@ def use_item(item):
     st.session_state.hp = min(st.session_state.hp, 150)
     return effect["msg"]
 
+# 解析回應中的數值變化與道具獲得
+def extract_effects(response_text):
+    hp_delta = 0
+    score_delta = 0
+    found_items = []
+
+    # HP 變化: HP +10 / HP -5
+    for sign, value in re.findall(r"HP\s*([+-])\s*(\d+)", response_text):
+        val = int(value)
+        hp_delta += val if sign == "+" else -val
+
+    # 分數變化: 分數 +10 / 分數 -5
+    for sign, value in re.findall(r"分數\s*([+-])\s*(\d+)", response_text):
+        val = int(value)
+        score_delta += val if sign == "+" else -val
+
+    # 道具獲得
+    for item_name in item_effects.keys():
+        if item_name in response_text and item_name not in found_items:
+            found_items.append(item_name)
+    if "神秘物品" in response_text and "神秘物品" not in found_items:
+        found_items.append("神秘物品")
+
+    return hp_delta, score_delta, found_items
+
 # 處理玩家輸入
 if not st.session_state.game_over:
     action = st.text_input("輸入你的行動（例如：探索街道、戰鬥敵人、休息）", key="action_input")
@@ -153,11 +196,27 @@ if not st.session_state.game_over:
             elif "分數 -" in response:
                 score_loss = int(response.split("分數 -")[1].split()[0])
                 st.session_state.score -= score_loss
-            if "獲得" in response and "物品" in response:
-                item = "神秘物品"
-                st.session_state.inventory.append(item)
-            if "獲得能量飲料" in response:
+
+            # 道具獲得判斷
+            if "護盾模組" in response:
+                st.session_state.inventory.append("護盾模組")
+                st.success("獲得道具：護盾模組。可在下方使用。")
+            if "能量飲料" in response:
                 st.session_state.inventory.append("能量飲料")
+                st.success("獲得道具：能量飲料。可在下方使用。")
+            if "增強藥劑" in response:
+                st.session_state.inventory.append("增強藥劑")
+                st.success("獲得道具：增強藥劑。可在下方使用。")
+
+            # 支援「使用 <道具>」文字指令
+            if "使用" in action:
+                for inv_item in list(st.session_state.inventory):
+                    if inv_item in action:
+                        msg = use_item(inv_item)
+                        st.session_state.inventory.remove(inv_item)
+                        st.session_state.scene += f"\n\n使用道具：{inv_item}。{msg}"
+                        st.info(f"已使用 {inv_item}")
+                        break
 
             # 隨機意外事件機率 (25%)
             if random.random() < 0.25:
@@ -185,6 +244,21 @@ if not st.session_state.game_over:
                     st.success("🎉 隨機寶箱！")
         else:
             st.warning("請輸入行動！")
+
+    # 道具自主使用介面
+    if st.session_state.inventory:
+        st.subheader("🔧 使用道具")
+        use_option = st.selectbox("選擇要使用的道具", st.session_state.inventory, key="use_item_select")
+        if st.button("使用道具"):
+            msg = use_item(use_option)
+            st.session_state.inventory.remove(use_option)
+            st.session_state.scene += f"\n\n使用道具：{use_option}。{msg}"
+            st.success(f"已使用 {use_option}：{msg}")
+            # 使用後立即刷新畫面，以更新狀態數值
+            st.experimental_rerun()
+    else:
+        st.info("目前無道具，快去探索或觸發事件獲得道具！")
+
 else:
     if st.button("重新開始"):
         st.session_state.hp = 100
