@@ -72,7 +72,7 @@ def generate_response(action):
     responses = {
         "探索": [
             "哦，看看這傢伙居然敢探索？小心別被自己的影子嚇到，菜鳥！HP -5",
-            "探索？哈，你以為這是遊樂園嗎？這裡是地獄！但算你運氣好，找到一個隨機寶箱！獲得神秘物品。",
+            "探索？哈，你以為這是遊樂園嗎？這裡是地獄！但算你運氣好，找到一個隨機寶箱！獲得護盾模組。",
             "探索個屁，你在幹嘛？浪費時間！HP -10"
         ],
         "戰鬥": [
@@ -114,6 +114,23 @@ def trigger_random_event():
     ]
     event_text, hp_delta, score_delta, item = random.choice(events)
     return event_text, hp_delta, score_delta, item
+
+# 道具效果定義
+item_effects = {
+    "能量飲料": {"hp": 30, "score": 5, "msg": "你喝下能量飲料，HP +30，分數 +5！"},
+    "護盾模組": {"hp": 0, "score": 15, "msg": "你啟動護盾模組，暫時防禦提升（未來可能減少傷害）。分數 +15！"},
+    "增強藥劑": {"hp": 50, "score": 10, "msg": "你注入增強藥劑，HP +50，分數 +10！"},
+}
+
+def use_item(item):
+    if item not in item_effects:
+        return "無效道具，無法使用。"
+    effect = item_effects[item]
+    st.session_state.hp += effect["hp"]
+    st.session_state.score += effect["score"]
+    # HP 上限 150
+    st.session_state.hp = min(st.session_state.hp, 150)
+    return effect["msg"]
 
 # 處理玩家輸入
 if not st.session_state.game_over:
