@@ -103,6 +103,18 @@ def generate_response(action):
 
     return response
 
+# 隨機意外事件（增加不可預測性）
+def trigger_random_event():
+    events = [
+        ("電網故障撞斷你的能量核心！HP -10", -10, 0, None),
+        ("幸運！你撿到遺失的加密晶片，分數 +15", 0, 15, None),
+        ("無人機空投治療包，HP +20", 20, 0, None),
+        ("遇到街頭黑客埋伏，HP -20", -20, 0, None),
+        ("霓虹煙霧彈爆開，HP -5，下一回合傷害減半（TODO）", -5, 0, None)
+    ]
+    event_text, hp_delta, score_delta, item = random.choice(events)
+    return event_text, hp_delta, score_delta, item
+
 # 處理玩家輸入
 if not st.session_state.game_over:
     action = st.text_input("輸入你的行動（例如：探索街道、戰鬥敵人、休息）", key="action_input")
@@ -111,7 +123,7 @@ if not st.session_state.game_over:
             response = generate_response(action)
             st.session_state.scene = f"你決定：{action}\n\nAI 回應：{response}"
 
-            # 更新狀態
+            # 更新狀態（行動結果）
             if "HP -" in response:
                 hp_loss = int(response.split("HP -")[1].split()[0])
                 st.session_state.hp -= hp_loss
@@ -129,6 +141,19 @@ if not st.session_state.game_over:
                 st.session_state.inventory.append(item)
             if "獲得能量飲料" in response:
                 st.session_state.inventory.append("能量飲料")
+
+            # 隨機意外事件機率 (25%)
+            if random.random() < 0.25:
+                event_text, event_hp, event_score, event_item = trigger_random_event()
+                st.session_state.scene += f"\n\n意外事件：{event_text}"
+                st.info(f"⚡ 意外事件發生：{event_text}")
+                if event_hp != 0:
+                    st.session_state.hp += event_hp
+                if event_score != 0:
+                    st.session_state.score += event_score
+                if event_item:
+                    st.session_state.inventory.append(event_item)
+
 
             # 檢查遊戲結束
             if st.session_state.hp <= 0:
