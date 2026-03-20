@@ -184,29 +184,15 @@ if not st.session_state.game_over:
             st.session_state.scene = f"你決定：{action}\n\nAI 回應：{response}"
 
             # 更新狀態（行動結果）
-            if "HP -" in response:
-                hp_loss = int(response.split("HP -")[1].split()[0])
-                st.session_state.hp -= hp_loss
-            elif "HP +" in response:
-                hp_gain = int(response.split("HP +")[1].split()[0])
-                st.session_state.hp += hp_gain
-            if "分數 +" in response:
-                score_gain = int(response.split("分數 +")[1].split()[0])
-                st.session_state.score += score_gain
-            elif "分數 -" in response:
-                score_loss = int(response.split("分數 -")[1].split()[0])
-                st.session_state.score -= score_loss
+            hp_delta, score_delta, found_items = extract_effects(response)
+            st.session_state.hp += hp_delta
+            st.session_state.score += score_delta
 
             # 道具獲得判斷
-            if "護盾模組" in response:
-                st.session_state.inventory.append("護盾模組")
-                st.success("獲得道具：護盾模組。可在下方使用。")
-            if "能量飲料" in response:
-                st.session_state.inventory.append("能量飲料")
-                st.success("獲得道具：能量飲料。可在下方使用。")
-            if "增強藥劑" in response:
-                st.session_state.inventory.append("增強藥劑")
-                st.success("獲得道具：增強藥劑。可在下方使用。")
+            for item in found_items:
+                if item not in st.session_state.inventory:
+                    st.session_state.inventory.append(item)
+                    st.success(f"獲得道具：{item}。可在下方使用。")
 
             # 支援「使用 <道具>」文字指令
             if "使用" in action:
@@ -217,6 +203,10 @@ if not st.session_state.game_over:
                         st.session_state.scene += f"\n\n使用道具：{inv_item}。{msg}"
                         st.info(f"已使用 {inv_item}")
                         break
+
+            # 確保分數變動顯示
+            if score_delta != 0:
+                st.success(f"分數已變動：{score_delta}，當前分數：{st.session_state.score}")
 
             # 隨機意外事件機率 (25%)
             if random.random() < 0.25:
